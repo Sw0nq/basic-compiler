@@ -5,7 +5,7 @@ class CodeGenerator:
         self.ast = ast
         self.generated_code = []
         self.variables = set()
-        self.indent_level = 0
+        self.current_indent = 0  # Добавляем инициализацию отступа
 
     def generate(self):
         """Генерирует Python-код из AST"""
@@ -34,7 +34,7 @@ class CodeGenerator:
         # Если это строка в кавычках, убираем внешние кавычки BASIC
         if value.startswith('"') and value.endswith('"'):
             value = value[1:-1]
-        indent = "    " * self.indent_level
+        indent = "    " * self.current_indent
         self.generated_code.append(f"{indent}print({repr(value)})")
 
     def generate_let(self, node):
@@ -61,7 +61,7 @@ class CodeGenerator:
         else:
             raise ValueError(f"Invalid value for LET: {value}")
 
-        indent = "    " * self.indent_level
+        indent = "    " * self.current_indent
         self.generated_code.append(f"{indent}{var_name} = {processed_value}")
 
     def generate_if(self, node):
@@ -70,35 +70,21 @@ class CodeGenerator:
         then_branch = node.then_branch
 
         # Генерируем условие
-        left = condition.left
-        op = self.translate_operator(condition.operator)
-        right = condition.right
+        condition_code = f"{condition.left} {self.translate_operator(condition.operator)} {condition.right}"
+        indent = "    " * self.current_indent
+        self.generated_code.append(f"{indent}if {condition_code}:")
 
-        # Обрабатываем правую часть условия
-        if right.isdigit() or right.replace('.', '', 1).isdigit():
-            right_processed = right
-        else:
-            right_processed = right
+        self.current_indent += 1
 
-        condition_code = f"{left} {op} {right_processed}"
-
-        # Генерируем тело THEN
-        self.generated_code.append(f"    if {condition_code}:")
-
-        # Увеличиваем уровень отступа для тела условия
-        self.indent_level += 1
-
-        # Обрабатываем команды в THEN
+        # Генерируем все команды в THEN-ветке
         for stmt in then_branch:
-            if stmt[0] == "PRINT":
-                print_value = stmt[1]
-                if print_value.startswith('"') and print_value.endswith('"'):
-                    print_value = print_value[1:-1]
-                indent = "    " * self.indent_level
-                self.generated_code.append(f"{indent}print({repr(print_value)})")
+            if isinstance(stmt, PrintNode):
+                self.generate_print(stmt)
+            else:
+                raise ValueError(f"Unsupported statement in THEN branch: {type(stmt)}")
 
-        # Возвращаем уровень отступа обратно
-        self.indent_level -= 1
+        # Возвращаем отступ
+        self.current_indent -= 1
 
     def translate_operator(self, op):
         """Переводит операторы BASIC в операторы Python"""
@@ -124,7 +110,7 @@ if __name__ == "__main__":
     test_code = '''
     PRINT "Hello, BASIC!"
     LET X = 10
-    IF X > 5 THEN PRINT "X is greater than 5"
+    IF X > 5 THEN PRINT "X is greater than 7"
     END
     '''
 

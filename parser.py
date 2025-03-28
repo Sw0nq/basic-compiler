@@ -98,12 +98,18 @@ class Parser:
                 if then[0] != "THEN":
                     raise SyntaxError(f"Ожидалось THEN, но получено: {then}")
 
-                # Парсим вложенные выражения внутри THEN (например, PRINT)
-                then_statements = []
-                while self.pos < len(self.tokens) and self.tokens[self.pos][0] not in ("NEWLINE", "END"):
-                    then_statements.append(self.consume())
+                print_token = self.consume()
+                if print_token[0] != "PRINT":
+                    raise SyntaxError(f"Ожидался PRINT после THEN, но получено: {print_token}")
 
-                statements.append(IfNode(ConditionNode(left[1], operator[1], right[1]), then_statements))
+                print_value = self.consume()
+                if print_value[0] not in ("STRING", "ID"):
+                    raise SyntaxError(f"Ожидалась строка или переменная в PRINT, но получено: {print_value}")
+
+                # Парсим вложенные выражения внутри THEN (например, PRINT)
+                print_node = PrintNode(print_value[1])
+
+                statements.append(IfNode(ConditionNode(left[1], operator[1], right[1]), [print_node]))
 
             elif token_type == "END":
                 self.consume()  # Пропускаем END
@@ -113,7 +119,6 @@ class Parser:
                 raise SyntaxError(f"Unexpected token: {token_value}")
 
         return statements
-
 
 
 # Тест парсера
