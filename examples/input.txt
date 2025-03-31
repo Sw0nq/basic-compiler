@@ -1,0 +1,4 @@
+PRINT "Hello, BASIC!"
+LET X = 10
+IF X > 5 THEN PRINT "X is greater than 5"
+END
