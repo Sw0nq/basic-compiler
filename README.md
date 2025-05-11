@@ -34,41 +34,9 @@ cd basic-compiler
 pip install antlr4-python3-runtime
 ```
 
-## Использование
+### Запуск компилятора
 
-### Запуск компилятора из командной строки
-
-```bash
-python src/compiler.py input.bas output.py --run --debug
-```
-
-Параметры:
-- `input.bas` - входной файл с кодом на BASIC
-- `output.py` - выходной файл с Python кодом (опционально)
-- `--run` - запустить сгенерированный код
-- `--debug` - включить отладочный вывод
-
-### Использование в своем коде
-
-```python
-from src.compiler import compile_basic_to_python
-
-basic_code = """
-LET X = 10
-PRINT "Value is"; X
-END
-"""
-
-python_code, errors = compile_basic_to_python(basic_code)
-
-if errors:
-    print("Ошибки:")
-    for error in errors:
-        print(f"  - {error}")
-else:
-    print(python_code)
-    exec(python_code)  # Выполнить код
-```
+Запустить compiler.py
 
 ## Структура проекта
 
