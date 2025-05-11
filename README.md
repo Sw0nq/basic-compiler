@@ -27,7 +27,7 @@
 
 ```bash
 # Клонирование репозитория
-git clone <repository-url>
+git clone https://github.com/Sw0nq/basic-compiler.git
 cd basic-compiler
 
 # Установка зависимостей
