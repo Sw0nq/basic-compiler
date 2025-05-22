@@ -1,5 +1,3 @@
-# Файл: BasicCompiler/src/semantic_analyzer.py
-
 from ast_nodes import (
     ProgramNode, PrintNode, LetNode, EndNode, IfNode, GotoNode, LabelReferenceNode,
     ForNode, NextNode, GosubNode, ReturnNode, WhileNode, InputNode,
@@ -25,8 +23,8 @@ class Symbol:
 class SymbolTable:
     """Таблица символов для хранения переменных и их типов"""
     def __init__(self):
-        self.symbols = {}  # name -> Symbol
-        self.labels = {}   # name -> LabelNode
+        self.symbols = {}
+        self.labels = {}
     
     def add_variable(self, name, type_suffix=None, initialized=False, line_number=None):
         """Добавляет или обновляет переменную в таблице символов"""
@@ -55,8 +53,6 @@ class SymbolTable:
 
 class TypeAnalyzer:
     """Анализатор типов выражений"""
-    
-    # Типы в BASIC (для суффиксов)
     STRING_TYPE = '$'  # Строковый тип (A$)
     SINGLE_TYPE = '!'  # Числа с плавающей точкой одинарной точности (A!)
     INTEGER_TYPE = '%' # Целые числа (A%)
@@ -66,7 +62,6 @@ class TypeAnalyzer:
     def get_expression_type(node, symbol_table):
         """Определяет тип выражения"""
         if isinstance(node, NumberNode):
-            # Целое или с плавающей точкой, в зависимости от значения
             return TypeAnalyzer.INTEGER_TYPE if node.value.is_integer() else TypeAnalyzer.DEFAULT_TYPE
         
         elif isinstance(node, StringNode):
@@ -81,22 +76,18 @@ class TypeAnalyzer:
         elif isinstance(node, BinaryOpNode):
             left_type = TypeAnalyzer.get_expression_type(node.left, symbol_table)
             right_type = TypeAnalyzer.get_expression_type(node.right, symbol_table)
-            
-            # Если один из операндов строка, результат строка (для + это конкатенация)
+
             if left_type == TypeAnalyzer.STRING_TYPE or right_type == TypeAnalyzer.STRING_TYPE:
                 if node.op == '+':
                     return TypeAnalyzer.STRING_TYPE
                 else:
                     raise SemanticError(f"Недопустимая операция {node.op} для строковых операндов")
-            
-            # Для числовых типов, результат зависит от операции
+
             if node.op in ['+', '-', '*', '/']:
-                # Для числовых операций
                 if left_type == TypeAnalyzer.INTEGER_TYPE and right_type == TypeAnalyzer.INTEGER_TYPE:
                     return TypeAnalyzer.INTEGER_TYPE
                 return TypeAnalyzer.DEFAULT_TYPE
             elif node.op in ['=', '<>', '<', '>', '<=', '>=']:
-                # Для сравнений результат логический (обрабатываем как целое)
                 return TypeAnalyzer.INTEGER_TYPE
             else:
                 raise SemanticError(f"Неизвестный оператор: {node.op}")
@@ -105,7 +96,6 @@ class TypeAnalyzer:
             operand_type = TypeAnalyzer.get_expression_type(node.operand, symbol_table)
             if operand_type == TypeAnalyzer.STRING_TYPE and node.op == '-':
                 raise SemanticError("Унарный минус не может быть применен к строке")
-            # Унарные операции сохраняют тип операнда
             return operand_type
         
         else:
@@ -117,11 +107,8 @@ class SemanticAnalyzer:
     def __init__(self):
         self.symbol_table = SymbolTable()
         self.errors = []
-        # Стек для хранения контекста для циклов FOR (для проверки NEXT)
         self.for_loops_stack = []
-        # Стек для хранения меток для GOSUB (для проверки RETURN)
         self.gosub_stack = []
-        # Флаг для отслеживания, были ли мы внутри подпрограммы
         self.in_subroutine = False
     
     def analyze(self, ast_root):
@@ -172,10 +159,8 @@ class SemanticAnalyzer:
                 elif isinstance(stmt, InputNode):
                     self._analyze_input(stmt)
                 elif isinstance(stmt, EndNode):
-                    # END просто завершает программу, нет семантических проверок
                     pass
                 elif isinstance(stmt, LabelNode):
-                    # Метки уже обработаны на первом проходе
                     pass
                 else:
                     self.errors.append(f"Неизвестный тип инструкции: {type(stmt)}")
@@ -186,16 +171,13 @@ class SemanticAnalyzer:
         """Анализирует инструкцию LET"""
         variable = let_node.variable
         value = let_node.value
-        
-        # Проверяем, что переменная правильно определена
+
         self.symbol_table.add_variable(variable.name, variable.type_suffix, initialized=True)
-        
-        # Проверяем тип выражения
+
         try:
             expr_type = TypeAnalyzer.get_expression_type(value, self.symbol_table)
             var_type = variable.type_suffix
-            
-            # Проверка совместимости типов
+
             if var_type == TypeAnalyzer.STRING_TYPE and expr_type != TypeAnalyzer.STRING_TYPE:
                 self.errors.append(f"Несоответствие типов: нельзя присвоить нестроковое значение строковой переменной {variable.name}$")
             elif var_type == TypeAnalyzer.INTEGER_TYPE and expr_type == TypeAnalyzer.STRING_TYPE:
@@ -209,7 +191,6 @@ class SemanticAnalyzer:
         for item in print_node.expressions_with_separators:
             expr = item['expression']
             try:
-                # Проверяем, что все выражения и их типы корректны
                 TypeAnalyzer.get_expression_type(expr, self.symbol_table)
             except SemanticError as e:
                 self.errors.append(str(e))
@@ -218,14 +199,11 @@ class SemanticAnalyzer:
         """Анализирует инструкцию IF"""
         condition = if_node.condition
         try:
-            # Проверяем, что условие корректно типизировано
             TypeAnalyzer.get_expression_type(condition, self.symbol_table)
-            
-            # Анализируем ветку THEN
+
             if if_node.then_branch:
                 self._analyze_statements([if_node.then_branch])
-            
-            # Анализируем ветку ELSE, если есть
+
             if if_node.else_branch:
                 self._analyze_statements([if_node.else_branch])
                 
@@ -235,18 +213,15 @@ class SemanticAnalyzer:
     def _analyze_goto(self, goto_node):
         """Анализирует инструкцию GOTO"""
         target_ref = goto_node.target_label_ref
-        # Проверяем, что целевая метка существует
         if not self.symbol_table.get_label(target_ref.name_or_number):
             self.errors.append(f"Переход на несуществующую метку: {target_ref.name_or_number}")
     
     def _analyze_for(self, for_node):
         """Анализирует инструкцию FOR"""
         loop_var = for_node.loop_variable
-        
-        # Добавляем переменную цикла в таблицу символов
+
         self.symbol_table.add_variable(loop_var.name, loop_var.type_suffix, initialized=True)
-        
-        # Проверяем типы начального, конечного и шагового значений
+
         try:
             start_type = TypeAnalyzer.get_expression_type(for_node.start_value, self.symbol_table)
             end_type = TypeAnalyzer.get_expression_type(for_node.end_value, self.symbol_table)
@@ -258,8 +233,7 @@ class SemanticAnalyzer:
                 step_type = TypeAnalyzer.get_expression_type(for_node.step_value, self.symbol_table)
                 if step_type == TypeAnalyzer.STRING_TYPE:
                     self.errors.append("Шаг цикла FOR должен быть числом")
-        
-            # Добавляем цикл в стек для проверки NEXT
+
             self.for_loops_stack.append(loop_var.name)
             
         except SemanticError as e:
@@ -268,35 +242,28 @@ class SemanticAnalyzer:
     def _analyze_next(self, next_node):
         """Анализирует инструкцию NEXT"""
         for var in next_node.variables:
-            # Проверяем, что переменная объявлена
             if not self.symbol_table.get_variable(var.name):
                 self.errors.append(f"Использование необъявленной переменной в NEXT: {var.name}")
-            
-            # Проверяем, что переменная соответствует открытому циклу FOR
+
             if not self.for_loops_stack or var.name != self.for_loops_stack[-1]:
                 self.errors.append(f"NEXT {var.name} без соответствующего FOR")
             else:
-                # Убираем переменную из стека, так как цикл закрыт
                 self.for_loops_stack.pop()
     
     def _analyze_gosub(self, gosub_node):
         """Анализирует инструкцию GOSUB"""
         target_ref = gosub_node.target_label_ref
-        # Проверяем, что целевая метка существует
         if not self.symbol_table.get_label(target_ref.name_or_number):
             self.errors.append(f"Вызов несуществующей подпрограммы: {target_ref.name_or_number}")
-        
-        # Добавляем метку в стек для проверки RETURN
+
         self.gosub_stack.append(target_ref.name_or_number)
         self.in_subroutine = True
     
     def _analyze_return(self, return_node):
         """Анализирует инструкцию RETURN"""
-        # Проверяем, что был соответствующий GOSUB
         if not self.gosub_stack:
             self.errors.append("RETURN без соответствующего GOSUB")
         else:
-            # Убираем метку из стека, так как произошел возврат
             self.gosub_stack.pop()
             if not self.gosub_stack:
                 self.in_subroutine = False
@@ -305,10 +272,8 @@ class SemanticAnalyzer:
         """Анализирует инструкцию WHILE"""
         condition = while_node.condition
         try:
-            # Проверяем, что условие корректно типизировано
             TypeAnalyzer.get_expression_type(condition, self.symbol_table)
-            
-            # Анализируем тело цикла
+
             self._analyze_statements(while_node.body)
                 
         except SemanticError as e:
@@ -316,7 +281,6 @@ class SemanticAnalyzer:
     
     def _analyze_input(self, input_node):
         """Анализирует инструкцию INPUT"""
-        # Проверяем подсказку, если есть
         if input_node.prompt:
             try:
                 prompt_type = TypeAnalyzer.get_expression_type(input_node.prompt, self.symbol_table)
@@ -324,7 +288,6 @@ class SemanticAnalyzer:
                     self.errors.append("Подсказка INPUT должна быть строкой")
             except SemanticError as e:
                 self.errors.append(str(e))
-        
-        # Добавляем переменные в таблицу символов
+
         for var in input_node.variables:
             self.symbol_table.add_variable(var.name, var.type_suffix, initialized=True) 
